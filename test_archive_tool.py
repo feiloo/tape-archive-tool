@@ -6,14 +6,63 @@ import subprocess
 import json
 import os
 
+import archive_tool
+
 # test config parameters
 tmp_testpath = '/data/'
 seed = 42
 
-def test_path_independent():
+# unimportant/unused numbers were replaced with X
+
+dsmc_query_filespace_output = '''IBM Storage Protect
+Command Line Backup-Archive Client Interface
+  Client Version X, Release X, Level XX.X
+  Client date/time: XX/XX/XXXX XX:XX:XX
+(c) Copyright IBM Corp. 1990, 2025. All Rights Reserved.
+
+Node Name: XXXXXXXXXXX
+Session established with server XXXXXXX: XXX
+  Server Version X, Release X, Level XX.XXX
+  Server date/time: XX/XX/XXXX XX:XX:XX  Last access: XX/XX/XXXX XX:XX:XX
+
+  #     Last Incr Date          Type    File Space Name
+--------------------------------------------------------------------------------
+  1     00/00/0   00:00:00     BTRFS   /a
+  2     00/00/0   00:00:00     XFS     /b
+  3     00/00/0   00:00:00     EXT4    /c
+  4     00/00/0   00:00:00     CIFS    /d
+'''
+
+def fake_dsmc(cmd, **kwargs):
+    print(cmd)
+    if cmd[:3] == ['dsmc', 'query', 'filespace']:
+        class FakeRes:
+            stdout = dsmc_query_filespace_output
+            stderr = ""
+        return FakeRes()
+
+    assert False
+
+@pytest.fixture
+def mock_dsmc(monkeypatch):
+    monkeypatch.setattr(archive_tool, "subproc", fake_dsmc)
+
+
+def test_path_independent(mock_dsmc):
     ''' the archive tool needs to work the same, independenly of the that its and and the path its called from
     '''
-    pass
+    archive_tool.list_archived_objects([], ignore_missing=True)
+    archive_objects('testfile', False)
+    '''
+    elif args.command == 'retrieve':
+        retrieve_object(args.object_name, args.destination)
+    elif args.command == 'recall':
+        recall(args.object_name)
+    elif args.command == 'delete':
+        delete_object(args.object_name)
+    elif args.command == 'info':
+        print_info()
+    '''
 
 # os.getcwd()
 # current_dir = os.getcwd()
@@ -107,7 +156,7 @@ def test_stress_many_parallel_retrieve():
 
 def test_archive_delete_archive():
 
-	pass
+    pass
 
 def gen_random_file(max_filesize=None, filetypes=None, path_prefix=None, path_type=None):
     ''' generate a single random file for fuzzing 
@@ -135,6 +184,7 @@ def test_error_archive_directory_noflag():
 
 
 
+@pytest.mark.skip(reason="Feature not implemented yet")
 def test_stress_archive_retrieval(tmp_path):
     # Configuration
     tmp_path = Path('tmp')
@@ -244,6 +294,7 @@ def test_full_lifecycle():
 
     make sure retrieval and listing works as expected
     """
+    '''
     assert 1 2 exist
 
     assertfail delete 1 2
@@ -268,10 +319,6 @@ def test_full_lifecycle():
     assertfail retrieve 1 2
     assertfail list 1 2
     assertfail recall 1 2
-
-
-archive [0,2] files
-retrieve [0,2] files
-
+    '''
 
 
