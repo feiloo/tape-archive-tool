@@ -198,6 +198,8 @@ def archiving_pre_check(paths):
         raise RuntimeError(f'object can only be specified and archived once')
 
     for path in paths:
+        if not Path(path).exists():
+            raise RuntimeError(f"cant archive nonexistent file: {path}")
         if not is_normal_file(path):
             raise RuntimeError(f'error, refusing special files: {path}')
         if get_filesize(path) < MIN_FILESIZE_BYTES:
@@ -213,6 +215,7 @@ def archiving_pre_check(paths):
 
 
 def archive_objects(paths, dry_run=False):
+    if not isinstance(paths, list): raise RuntimeError('paths must be list')
     archiving_pre_check(paths)
             
     stubfiles = []
@@ -300,9 +303,9 @@ def list_archived_objects(paths, ignore_missing):
 def get_from_archive(name, destination):
     print(f"getting {name} to {destination}")
     if name.endswith('.archive_stub'):
-        raise RuntimeError("name looks like a stubfile, use the actual objectname instead")
+        raise RuntimeError(f"name looks like a stubfile, use the actual objectname instead")
     if not Path(stubname(name)).exists():
-        raise RuntimeError("stubfile {stubname(name)} for {name} not found")
+        raise RuntimeError(f"stubfile {stubname(name)} for {name} not found")
 
     if Path(destination).exists():
         raise RuntimeError("destination path is not free")
@@ -317,6 +320,7 @@ def get_from_archive(name, destination):
 def retrieve_object(name, destination):
     if (stubname(name) == destination) or (stubname(name) == stubname(destination)):
         raise RuntimeError("retrieveing a object to its original path is not supported. use recall to move a file from the archive back to its original path")
+    # todo open stubfile, to verify hash after retrieve
     get_from_archive(name, destination)
 
 def recall(name):
