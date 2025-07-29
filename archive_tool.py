@@ -83,7 +83,7 @@ def parse_file_space_names(text: str) -> List[str]:
     # Parse data rows
     file_spaces = []
     # Match lines starting with number, then date, then type, then path
-    data_pattern = r"^\s*\d+\s+\d{2}/\d{2}/\d\s+\d{2}:\d{2}:\d{2}\s+([A-Z]+)\s+(/\S*)\s*$"
+    data_pattern = r"^\s*\d+\s+\d{2}/\d{2}/\d\s+\d{2}:\d{2}:\d{2}\s+([A-Z0-9]+)\s+(/\S*)\s*$"
     
     for i in range(header_idx + 2, len(lines)):
         line = lines[i].strip()
