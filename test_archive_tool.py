@@ -34,14 +34,42 @@ Session established with server XXXXXXX: XXX
 '''
 
 def fake_dsmc(cmd, **kwargs):
+    ''' this is a test-spy-object for "mocking" out the dsmc tool '''
     print(cmd)
     if cmd[:3] == ['dsmc', 'query', 'filespace']:
         class FakeRes:
             stdout = dsmc_query_filespace_output
             stderr = ""
         return FakeRes()
+    elif cmd[:2] == ['dsmc', 'archive']:
+        objnames = cmd[2:]
+        class FakeRes:
+            stdout = ""
+            stderr = ""
+        return FakeRes()
+    elif cmd[:3] == ['dsmc', 'query', 'archive']:
+        class FakeRes:
+            stdout = ""
+            stderr = ""
+        return FakeRes()
+    elif cmd[:2] == ['dsmc', 'retrieve']:
+        class FakeRes:
+            stdout = ""
+            stderr = ""
+        return FakeRes()
+    elif cmd[:2] == ['dsmc', 'delete']:
+        class FakeRes:
+            stdout = ""
+            stderr = ""
+        return FakeRes()
+    elif cmd[:3] == ['dsmc', 'query','systeminfo']:
+        class FakeRes:
+            stdout = ""
+            stderr = ""
+        return FakeRes()
 
-    assert False
+    # should not reach here
+    assert False, "unexpected dmsc command invoked during testing"
 
 @pytest.fixture
 def mock_dsmc(monkeypatch):
@@ -52,17 +80,11 @@ def test_path_independent(mock_dsmc):
     ''' the archive tool needs to work the same, independenly of the that its and and the path its called from
     '''
     archive_tool.list_archived_objects([], ignore_missing=True)
-    archive_objects('testfile', False)
-    '''
-    elif args.command == 'retrieve':
-        retrieve_object(args.object_name, args.destination)
-    elif args.command == 'recall':
-        recall(args.object_name)
-    elif args.command == 'delete':
-        delete_object(args.object_name)
-    elif args.command == 'info':
-        print_info()
-    '''
+    #archive_tool.archive_objects(['testfile'], False)
+    #archive_tool.retrieve_object('testfile', 'testfile2')
+    # archive_tool.recall('testfile2')
+    #archive_tool.delete_object('testfile')
+    #archive_tool.print_info()
 
 # os.getcwd()
 # current_dir = os.getcwd()
