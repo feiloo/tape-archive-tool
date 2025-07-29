@@ -221,3 +221,57 @@ def test_stress_archive_retrieval(tmp_path):
     print(f"{NUM_FILES} files archived and retrieved successfully")
 
 
+# test scenarios:
+
+# 1. just archive a lot of objects
+
+# 2. retrieve a single object
+
+# 3. recall a single object
+
+# 4. delete a single object
+
+# 5. list the objects
+
+# 6. combinations of scenarios with 1..N objects
+
+def test_full_lifecycle():
+    """ tests the full file lifecycle
+    the file can transfer from local to archive,
+    migrate back
+    archive again
+    deleted in archive
+
+    make sure retrieval and listing works as expected
+    """
+    assert 1 2 exist
+
+    assertfail delete 1 2
+    assertfail list 1 2
+    assertfail retrieve 1 2
+    assertfail recall 1 2
+
+    assert archive 1 2
+    assert list 1 2
+    assert retrieve 1 2
+    assert recall 1 2
+
+    assertfail retrieve 1 2
+    assertfail list 1 2
+
+    assert 1 2 exist
+
+    assert archive 1 2
+    assert list 1 2
+    assert delete 1 2
+
+    assertfail retrieve 1 2
+    assertfail list 1 2
+    assertfail recall 1 2
+
+
+archive [0,2] files
+retrieve [0,2] files
+
+
+
