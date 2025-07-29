@@ -2,10 +2,19 @@
 
 this simple tool enables simple file archiving and retrieval to and from IBM Storage Protect with the dsmc command.
 
-it does extensive checking and tracks additional metadata to ensure correct archival.
+tested only on headless linux/opensuse-leap with python 3.12
 
-it is very strict and only archives big normal files and not folders.
+### design features
 
+* it does extensive checking and tracks additional metadata to ensure correct archival.
+* it is very strict and only archives big normal files and not folders.
+* single file
+
+dependencies:
+
+* dsmc
+* sha256sum command 
+* python standard library
 
 ### Notes:
 
