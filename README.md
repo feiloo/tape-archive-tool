@@ -16,6 +16,27 @@ dependencies:
 * sha256sum command 
 * python standard library
 
+### usage
+
+```
+usage: archive_tool.py [-h] {list,archive,retrieve,recall,delete,info} ...
+
+Archive system client utility
+
+positional arguments:
+  {list,archive,retrieve,recall,delete,info}
+    list                List all archived objects or all in the given paths
+    archive             Migrate files to the archive system
+    retrieve            Retrieve a copy of an archived object
+    recall              Migrate an archived object back to its original path
+    delete              Remove an object from the archives
+    info                Print archive system information
+
+options:
+  -h, --help            show this help message and exit
+
+```
+
 ### Notes:
 
 deep folder hierarchies on windows are limited or use an extension: `\\?\`
