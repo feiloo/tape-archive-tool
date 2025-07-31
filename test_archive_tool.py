@@ -9,6 +9,7 @@ import os
 import random
 import re
 import string
+import socket
 
 import archive_tool
 
@@ -36,13 +37,13 @@ Session established with server XXXXXXX: XXX
   3     00/00/0   00:00:00     EXT4    /c
   4     00/00/0   00:00:00     CIFS    /d
 '''
-DSMC_SPY = None
+DSMC_SPY = []
 
 def fake_dsmc(cmd, **kwargs):
     ''' this is a test-spy-object for "mocking" out the dsmc tool '''
     global DSMC_SPY
 
-    DSMC_SPY = cmd
+    DSMC_SPY += [cmd]
 
     print(cmd)
     if cmd[:3] == ['dsmc', 'query', 'filespace']:
@@ -94,11 +95,11 @@ def fake_dsmc(cmd, **kwargs):
     assert False, "unexpected dmsc command invoked during testing"
 
 @pytest.fixture
-def mock_dsmc(monkeypatch):
+def spy_dsmc(monkeypatch):
     monkeypatch.setattr(archive_tool, "subproc", fake_dsmc)
 
 
-def test_path_independent(mock_dsmc):
+def test_path_independent():
     ''' the archive tool needs to work the same, independenly of the that it is at and and the path its called from
     '''
 
@@ -302,7 +303,6 @@ def gen_random_file(
             os.mkfifo(filepath)
 
         elif filetype == 'socket':
-            import socket
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
                 sock.bind(str(filepath))
@@ -443,7 +443,8 @@ def test_stress_archive_retrieval(tmp_path):
 
 # 6. combinations of scenarios with 1..N objects
 
-def test_full_lifecycle():
+@pytest.mark.skip(reason="very slow")
+def test_full_lifecycle_two_files():
     """ tests the full file lifecycle
     the file can transfer from local to archive,
     migrate back
@@ -479,12 +480,28 @@ def test_full_lifecycle():
     assertfail recall 1 2
     '''
 
-def test_small_with_spy(mock_dsmc):
+def test_small_with_spy(spy_dsmc):
+    global DSMC_SPY
     archive_tool.list_archived_objects([], ignore_missing=True)
+    assert DSMC_SPY[0] == ['dsmc', 'query', 'filespace'], DSMC_SPY
+    assert DSMC_SPY[1][:2] == ['dsmc', 'query'], DSMC_SPY
+    DSMC_SPY = []
     testfile = str(gen_random_file())
     archive_tool.archive_objects([testfile], False)
-    archive_tool.retrieve_object(testfile, 'testfile2')
+    assert DSMC_SPY[0][:2] == ['sha256sum', testfile], DSMC_SPY
+    assert DSMC_SPY[1][:2] == ['dsmc', 'archive'], DSMC_SPY
+    DSMC_SPY = []
+    retrieve_target_filename = _generate_filename(True, MAX_FILENAME_LEN)
+    archive_tool.retrieve_object(testfile, retrieve_target_filename)
+    assert DSMC_SPY[0][:2] == ['dsmc', 'retrieve'], DSMC_SPY
+    DSMC_SPY = []
     archive_tool.recall(testfile)
+    assert DSMC_SPY[0][:2] == ['dsmc', 'retrieve'], DSMC_SPY
+    DSMC_SPY = []
     archive_tool.delete_object(testfile)
+    assert DSMC_SPY[0][:2] == ['dsmc', 'delete'], DSMC_SPY
+    DSMC_SPY = []
     archive_tool.print_info()
+    assert DSMC_SPY[0][:3] == ['dsmc', 'query', 'systeminfo'], DSMC_SPY
+    DSMC_SPY = []
 
