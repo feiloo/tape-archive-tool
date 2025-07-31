@@ -317,6 +317,8 @@ def get_from_archive(name, destination):
     print(f"getting {name} to {destination}")
     if name.endswith('.archive_stub'):
         raise RuntimeError(f"name looks like a stubfile, use the actual objectname instead")
+    if destination.endswith('.archive_stub'):
+        raise RuntimeError(f"stopping, retrieving or recalling to a stubfile is rarely what you want, use dsmc if you really need to retrieve a stubfile")
     if not Path(stubname(name)).exists():
         raise RuntimeError(f"stubfile {stubname(name)} for {name} not found")
 
@@ -331,8 +333,10 @@ def get_from_archive(name, destination):
         sys.exit(1)
 
 def retrieve_object(name, destination):
-    if (stubname(name) == destination) or (stubname(name) == stubname(destination)):
-        raise RuntimeError("retrieveing a object to its original path is not supported. use recall to move a file from the archive back to its original path")
+    # dont retrieving when source and destination indicate a recall operation
+    if (Path(name).is_absolute() and Path(name) == Path(destination).resolve()) \
+        or Path(stubname(destination)).exists():
+        raise RuntimeError("retrieving a object to its original path is not supported. use recall to move a file from the archive back to its original path")
     # todo open stubfile, to verify hash after retrieve
     get_from_archive(name, destination)
 
