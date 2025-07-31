@@ -25,6 +25,9 @@ import socket
 STUBFILE_SUFFIX = ".archive_stub"
 
 MIN_FILESIZE_BYTES = 1_000_000_000 # 1 GB
+MAX_FILENAME_LEN = 255
+MAX_DEPTH = 16
+MAX_TOTAL_LEN = 512
 
 session_uuid = (uuid4())
 session_hostname = socket.getfqdn()
@@ -83,7 +86,7 @@ def parse_file_space_names(text: str) -> List[str]:
     # Parse data rows
     file_spaces = []
     # Match lines starting with number, then date, then type, then path
-    data_pattern = r"^\s*\d+\s+\d{2}/\d{2}/\d\s+\d{2}:\d{2}:\d{2}\s+([A-Z0-9]+)\s+(/\S*)\s*$"
+    data_pattern = r"^\s*\d+\s+\d{2}/\d{2}/\d\s+\d{2}:\d{2}:\d{2}\s+([a-zA-Z0-9]+)\s+(/\S*)\s*$"
     
     for i in range(header_idx + 2, len(lines)):
         line = lines[i].strip()
@@ -101,7 +104,7 @@ def parse_file_space_names(text: str) -> List[str]:
     return file_spaces
 
 
-def validate_filepath(filepath: str, max_total_len: int = 512, max_filename_len: int = 255, max_depth: int = 16) -> None:
+def validate_filepath(filepath: str, ) -> None:
     """
     Validate filepath for length, depth, and character safety.
     Raises ValueError if invalid.
@@ -110,18 +113,18 @@ def validate_filepath(filepath: str, max_total_len: int = 512, max_filename_len:
         raise ValueError("File path is empty")
 
     # Check total path length
-    if len(filepath) > max_total_len:
-        raise ValueError(f"Path too long: {len(filepath)} > {max_total_len} characters")
+    if len(filepath) > MAX_TOTAL_LEN:
+        raise ValueError(f"Path too long: {len(filepath)} > {MAX_TOTAL_LEN} characters")
 
     # Check depth (number of directories)
     parts = [p for p in filepath.split(os.sep) if p]
-    if len(parts) > max_depth:
-        raise ValueError(f"Path too deep: {len(parts)} components > {max_depth}")
+    if len(parts) > MAX_DEPTH:
+        raise ValueError(f"Path too deep: {len(parts)} components > {MAX_DEPTH}")
 
     # Extract filename
     filename = os.path.basename(filepath)
-    if len(filename) > max_filename_len:
-        raise ValueError(f"Filename too long: {len(filename)} > {max_filename_len} characters")
+    if len(filename) > MAX_FILENAME_LEN:
+        raise ValueError(f"Filename too long: {len(filename)} > {MAX_FILENAME_LEN} characters")
 
     # Check for non-ASCII characters
     try:
