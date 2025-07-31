@@ -339,8 +339,11 @@ def retrieve_object(name, destination):
 def recall(name):
     get_from_archive(name, name)
     with Path(stubname(name)).open('at') as f:
-        f.write(json.dumps({'entry_type':"state", "state":"started_unarchiving", "path":str(name)}) + '\n')
+        f.write(json.dumps({'entry_type':"state", "state":"started_recalling", "path":str(name)}) + '\n')
     delete_object(name)
+    # now also delete stubfile from archive
+    delete_object(stubname(name))
+    # finally delete the local stubfile
     Path(stubname(name)).unlink(missing_ok=False)
 
 
@@ -352,7 +355,7 @@ def delete_object(name):
 
     try:
         subproc(['dsmc', 'delete', 'archive', '-noprompt', name])
-        print(f"{name} successfully deleted")
+        print(f"{name} successfully deleted from archive")
     except subprocess.CalledProcessError as e:
         print(f"Deleting archive operation failed: {e}")
         sys.exit(1)
