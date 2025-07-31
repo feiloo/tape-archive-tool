@@ -321,10 +321,10 @@ def get_from_archive(name, destination):
         raise RuntimeError(f"stubfile {stubname(name)} for {name} not found")
 
     if Path(destination).exists():
-        raise RuntimeError("destination path is not free")
+        raise RuntimeError(f"destination path is not free, there is already a file or folder: {destination}")
 
     try:
-        subproc(['dsmc', 'retrieve', '-replace=no', name, destination])
+        subproc(['dsmc', 'retrieve', '-replace=no', '-subdir=no', name, destination])
         print(f"{name} successfully retrieved")
     except subprocess.CalledProcessError as e:
         print(f"Retrieving archive operation failed: {e}")
@@ -392,7 +392,7 @@ def main():
     # Retrieve command
     retrieve_parser = subparsers.add_parser('retrieve', help='Retrieve a copy of an archived object')
     retrieve_parser.add_argument('object_name', type=str, help='Name of archived object (without extension)')
-    retrieve_parser.add_argument('--destination', '-d', type=str, default=os.getcwd(),
+    retrieve_parser.add_argument('--destination', '-d', type=str, default=None,
                                 help='Target directory for retrieval (default: current directory)')
     # recall command
     recall_parser = subparsers.add_parser('recall', help='Migrate an archived object back to its original path')
@@ -412,7 +412,11 @@ def main():
     elif args.command == 'archive':
         archive_objects(args.object_path, args.dry_run)
     elif args.command == 'retrieve':
-        retrieve_object(args.object_name, args.destination)
+        if args.destination is None:
+            destination = str(Path(os.getcwd()) / Path(args.object_name).name)
+        else:
+            destination = args.destination
+        retrieve_object(args.object_name, destination)
     elif args.command == 'recall':
         recall(args.object_name)
     elif args.command == 'delete':
