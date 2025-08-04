@@ -298,7 +298,7 @@ def list_archived_objects(paths, ignore_missing):
     if paths == []:
         # get all filespaces (filesystem paths):
         filespaces = get_all_filespaces()
-        path_to_list = [p.removesuffix('/') + '/*' for p in paths]
+        paths_to_list = [p.removesuffix('/') + '/*' for p in filespaces]
     else:
         paths_to_list = paths
 
