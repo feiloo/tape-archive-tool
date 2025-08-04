@@ -173,6 +173,7 @@ def is_normal_file(filepath: str) -> bool:
 
 def sha256sum(filepath: str) -> str:
     """Compute SHA256 sum of a file using the `sha256sum` subprocess to ensure compatibilty with users using the command."""
+    assert isinstance(filepath, str)
     try:
         result = subproc(['sha256sum', filepath])
         # Output: "<hex>  <filename>"
@@ -193,7 +194,9 @@ def parse_stubfile(filepath) -> dict:
 
     return json.loads(lines[-1])
 
-def stubname(path):
+def stubname(path: str):
+    ''' get the stubname of a file '''
+    assert isinstance(path, str)
     return path + STUBFILE_SUFFIX
 
 def get_object_metadata(path):
@@ -223,7 +226,7 @@ def archiving_pre_check(paths):
         validate_filepath(path)
 
 
-def archive_objects(paths, dry_run=False):
+def archive_objects(paths: list[str], dry_run=False):
     if not isinstance(paths, list): raise RuntimeError('paths must be list')
     archiving_pre_check(paths)
             

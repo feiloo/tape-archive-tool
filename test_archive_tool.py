@@ -99,13 +99,6 @@ def spy_dsmc(monkeypatch):
     monkeypatch.setattr(archive_tool, "subproc", fake_dsmc)
 
 
-def test_path_independent():
-    ''' the archive tool needs to work the same, independenly of the that it is at and and the path its called from
-    '''
-
-# os.getcwd()
-# current_dir = os.getcwd()
-
 def create_many_flat_folders_and_files(path, num_folders=10000):
     for i in range(1, num_folders + 1):
         folder_path = os.path.join(path, f'folder_{i}')
@@ -252,6 +245,11 @@ def _write_random_file_iterative(filepath, filesize, chunk_size=64*1024):
             chunk = os.urandom(min(chunk_size, filesize))
             f.write(chunk)
             filesize -= len(chunk)
+
+
+def get_file_checksum(filepath):
+    checksum = hashlib.md5(open(filepath,'rb').read()).hexdigest()
+    return checksum
 
 def gen_random_file(
     small_file=False,
@@ -443,7 +441,8 @@ def test_stress_archive_retrieval(tmp_path):
 
 # 6. combinations of scenarios with 1..N objects
 
-@pytest.mark.skip(reason="very slow")
+
+#@pytest.mark.skip(reason="very slow")
 def test_full_lifecycle_two_files():
     """ tests the full file lifecycle
     the file can transfer from local to archive,
@@ -453,33 +452,92 @@ def test_full_lifecycle_two_files():
 
     make sure retrieval and listing works as expected
     """
-    '''
-    assert 1 2 exist
 
-    assertfail delete 1 2
-    assertfail list 1 2
-    assertfail retrieve 1 2
-    assertfail recall 1 2
+    # use 2 files to test some combinations
 
-    assert archive 1 2
-    assert list 1 2
-    assert retrieve 1 2
-    assert recall 1 2
+    testfile1 = str(gen_random_file())
+    testfile2 = str(gen_random_file())
+    checksum1 = get_file_checksum(testfile1)
+    checksum2 = get_file_checksum(testfile2)
+    
+    print("ensuring errors on invalid commands for the state where nothing is archived")
+    assert Path(testfile1).exists()
+    with pytest.raises(SystemExit):
+        archive_tool.delete_object(testfile1)
+    assert Path(testfile1).exists()
+    with pytest.raises(SystemExit):
+        archive_tool.retrieve_object(testfile1, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
+    assert Path(testfile1).exists()
+    with pytest.raises(SystemExit):
+        archive_tool.recall(t, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
+    assert Path(testfile1).exists()
 
-    assertfail retrieve 1 2
-    assertfail list 1 2
+    print("ensuring dryrun is dry")
+    archive_tool.archive_objects(testfile1, dry_run=True)
+    assert Path(testfile1).exists()
+    assert not Path(archive_tool.stubname(testfile1)).exists()
 
-    assert 1 2 exist
+    print('ensuring files were replaced with their stubfiles')
+    archive_tool.archive_objects([testfile1, testfile2], dry_run=False)
+    assert not Path(testfile1).exists()
+    assert Path(archive_tool.stubname(testfile1)).exists()
 
-    assert archive 1 2
-    assert list 1 2
-    assert delete 1 2
+    print('ensuring archiving is at-most-once')
+    with pytest.raises(SystemExit):
+        archive_tool.archive_objects([testfile1], dry_run=False)
+    with pytest.raises(SystemExit):
+        archive_tool.archive_objects([testfile2], dry_run=False)
+    with pytest.raises(SystemExit):
+        archive_tool.archive_objects([testfile1, testfile2], dry_run=False)
 
-    assertfail retrieve 1 2
-    assertfail list 1 2
-    assertfail recall 1 2
-    '''
 
+    print('ensuring retrieved correctly')
+    dest = Path(tmp_testpath) / 'fullscale_test_retrieve_file1b'
+    assert not dest.exists() # test cleanliness check
+    archive_tool.retrieve_object(testfile1, dest)
+    assert get_file_checksum(dest) == checksum1
+    dest.unlink() # cleanup
+
+    dest2 = Path(tmp_testpath) / 'fullscale_test_retrieve_file2b'
+    assert not dest2.exists() # test cleanliness check
+    archive_tool.retrieve_object(testfile2, dest)
+    assert get_file_checksum(dest2) == checksum2
+    dest2.unlink() # cleanup
+
+    archive_tool.recall(testfile1)
+    assert Path(testfile1).exists()
+    assert not Path(archive_tool.stubname(testfile1)).exists()
+    assert get_file_checksum(testfile1) == checksum1
+
+    archive_tool.recall(testfile2)
+    assert Path(testfile2).exists()
+    assert not Path(archive_tool.stubname(testfile2)).exists()
+    assert get_file_checksum(testfile2) == checksum2
+
+    print('ensuring archiving again now still works')
+    archive_tool.archive_objects([testfile1, testfile2], dry_run=False)
+    assert not Path(testfile1).exists()
+    assert Path(archive_tool.stubname(testfile1)).exists()
+
+    print('ensuring deletion and also cleanup')
+    archive_tool.delete(testfile1)
+    archive_tool.delete(testfile2)
+
+    print("ensuring errors on invalid commands for the state where nothing is archived")
+    assert Path(testfile1).exists()
+    with pytest.raises(SystemExit):
+        archive_tool.delete_object(testfile1)
+    assert Path(testfile1).exists()
+    with pytest.raises(SystemExit):
+        archive_tool.retrieve_object(testfile1, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
+    assert Path(testfile1).exists()
+    with pytest.raises(SystemExit):
+        archive_tool.recall(t, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
+    assert Path(testfile1).exists()
+
+
+
+@pytest.mark.skip(reason="very slow")
 def test_small_with_spy(spy_dsmc):
     global DSMC_SPY
     archive_tool.list_archived_objects([], ignore_missing=True)
