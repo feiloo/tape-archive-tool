@@ -462,33 +462,28 @@ def test_full_lifecycle_two_files():
     
     print("ensuring errors on invalid commands for the state where nothing is archived")
     assert Path(testfile1).exists()
-    with pytest.raises(SystemExit):
+    with pytest.raises(Exception):
         archive_tool.delete_object(testfile1)
     assert Path(testfile1).exists()
-    with pytest.raises(SystemExit):
+    with pytest.raises(Exception):
         archive_tool.retrieve_object(testfile1, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
     assert Path(testfile1).exists()
-    with pytest.raises(SystemExit):
+    with pytest.raises(Exception):
         archive_tool.recall(t, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
     assert Path(testfile1).exists()
 
-    print("ensuring dryrun is dry")
-    archive_tool.archive_objects(testfile1, dry_run=True)
-    assert Path(testfile1).exists()
-    assert not Path(archive_tool.stubname(testfile1)).exists()
-
     print('ensuring files were replaced with their stubfiles')
-    archive_tool.archive_objects([testfile1, testfile2], dry_run=False)
+    archive_tool.archive_objects([testfile1, testfile2])
     assert not Path(testfile1).exists()
     assert Path(archive_tool.stubname(testfile1)).exists()
 
     print('ensuring archiving is at-most-once')
-    with pytest.raises(SystemExit):
-        archive_tool.archive_objects([testfile1], dry_run=False)
-    with pytest.raises(SystemExit):
-        archive_tool.archive_objects([testfile2], dry_run=False)
-    with pytest.raises(SystemExit):
-        archive_tool.archive_objects([testfile1, testfile2], dry_run=False)
+    with pytest.raises(Exception):
+        archive_tool.archive_objects([testfile1])
+    with pytest.raises(Exception):
+        archive_tool.archive_objects([testfile2])
+    with pytest.raises(Exception):
+        archive_tool.archive_objects([testfile1, testfile2])
 
 
     print('ensuring retrieved correctly')
@@ -515,7 +510,7 @@ def test_full_lifecycle_two_files():
     assert get_file_checksum(testfile2) == checksum2
 
     print('ensuring archiving again now still works')
-    archive_tool.archive_objects([testfile1, testfile2], dry_run=False)
+    archive_tool.archive_objects([testfile1, testfile2])
     assert not Path(testfile1).exists()
     assert Path(archive_tool.stubname(testfile1)).exists()
 
@@ -525,13 +520,13 @@ def test_full_lifecycle_two_files():
 
     print("ensuring errors on invalid commands for the state where nothing is archived")
     assert Path(testfile1).exists()
-    with pytest.raises(SystemExit):
+    with pytest.raises(Exception):
         archive_tool.delete_object(testfile1)
     assert Path(testfile1).exists()
-    with pytest.raises(SystemExit):
+    with pytest.raises(Exception):
         archive_tool.retrieve_object(testfile1, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
     assert Path(testfile1).exists()
-    with pytest.raises(SystemExit):
+    with pytest.raises(Exception):
         archive_tool.recall(t, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
     assert Path(testfile1).exists()
 
