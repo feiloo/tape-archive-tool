@@ -208,9 +208,9 @@ def get_object_metadata(path):
     return {'secondary_obj_id':str(uuid4())}
 
 
-def archiving_pre_check(paths):
+def archiving_pre_check(paths: list[str]):
     # preflight checks:
-    if list(set(paths)) != list(paths):
+    if len(paths) > 1 and list(sorted(set(paths))) != list(sorted(paths)):
         raise RuntimeError(f'object can only be specified and archived once')
 
     for path in paths:
@@ -236,6 +236,7 @@ def archive_objects(paths: list[str]):
             
     stubfiles = []
     for path in paths:
+        assert isinstance(path, str)
         print(f"Archiving {path}")
         file_checksum = sha256sum(path)
         metadata = get_object_metadata(path)
@@ -305,7 +306,7 @@ def list_archived_objects(paths, ignore_missing):
         result = list_archived_objects_under_path(p, ignore_error=ignore_missing)
         print(f"archives under {p}: {result}")
 
-def get_from_archive(name, destination):
+def get_from_archive(name: str, destination: str):
     print(f"getting {name} to {destination}")
     if name.endswith('.archive_stub'):
         raise RuntimeError(f"name looks like a stubfile, use the actual objectname instead")

@@ -466,7 +466,7 @@ def test_full_lifecycle_two_files():
         archive_tool.delete_object(testfile1)
     assert Path(testfile1).exists()
     with pytest.raises(Exception):
-        archive_tool.retrieve_object(testfile1, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
+        archive_tool.retrieve_object(testfile1, str(Path(tmp_testpath) / 'fullscale_test_retrieve_file1'))
     assert Path(testfile1).exists()
     with pytest.raises(Exception):
         archive_tool.recall(t, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
@@ -487,15 +487,15 @@ def test_full_lifecycle_two_files():
 
 
     print('ensuring retrieved correctly')
-    dest = Path(tmp_testpath) / 'fullscale_test_retrieve_file1b'
-    assert not dest.exists() # test cleanliness check
-    archive_tool.retrieve_object(testfile1, dest)
-    assert get_file_checksum(dest) == checksum1
-    dest.unlink() # cleanup
+    dest1 = Path(tmp_testpath) / 'fullscale_test_retrieve_file1b'
+    assert not dest1.exists() # test cleanliness check
+    archive_tool.retrieve_object(testfile1, str(dest1))
+    assert get_file_checksum(dest1) == checksum1
+    dest1.unlink() # cleanup
 
     dest2 = Path(tmp_testpath) / 'fullscale_test_retrieve_file2b'
     assert not dest2.exists() # test cleanliness check
-    archive_tool.retrieve_object(testfile2, dest)
+    archive_tool.retrieve_object(testfile2, str(dest2))
     assert get_file_checksum(dest2) == checksum2
     dest2.unlink() # cleanup
 
@@ -515,20 +515,16 @@ def test_full_lifecycle_two_files():
     assert Path(archive_tool.stubname(testfile1)).exists()
 
     print('ensuring deletion and also cleanup')
-    archive_tool.delete(testfile1)
-    archive_tool.delete(testfile2)
+    archive_tool.delete_object(testfile1)
+    archive_tool.delete_object(testfile2)
 
     print("ensuring errors on invalid commands for the state where nothing is archived")
-    assert Path(testfile1).exists()
     with pytest.raises(Exception):
         archive_tool.delete_object(testfile1)
-    assert Path(testfile1).exists()
     with pytest.raises(Exception):
-        archive_tool.retrieve_object(testfile1, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
-    assert Path(testfile1).exists()
+        archive_tool.retrieve_object(testfile1, str(Path(tmp_testpath) / 'fullscale_test_retrieve_file1'))
     with pytest.raises(Exception):
-        archive_tool.recall(t, Path(tmp_testpath) / 'fullscale_test_retrieve_file1')
-    assert Path(testfile1).exists()
+        archive_tool.recall(testfile1, str(Path(tmp_testpath) / 'fullscale_test_retrieve_file1'))
 
 
 
