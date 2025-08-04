@@ -33,8 +33,12 @@ session_uuid = (uuid4())
 session_hostname = socket.getfqdn()
 session_hosttime = str(datetime.datetime.now().isoformat())
 
-def subproc(cmd: List[str]):
+add_dsmc_sudo = True
+
+def subproc(cmd: List[str], with_sudo=False):
     ''' subprocess wrap function for better monkeypatching and better argument control '''
+    if with_sudo or add_dsmc_sudo and cmd[0]=='dsmc':
+        cmd = ['sudo'] + cmd
     result = subprocess.run(
         cmd,
         check=True,
@@ -226,7 +230,7 @@ def archiving_pre_check(paths):
         validate_filepath(path)
 
 
-def archive_objects(paths: list[str], dry_run=False):
+def archive_objects(paths: list[str]):
     if not isinstance(paths, list): raise RuntimeError('paths must be list')
     archiving_pre_check(paths)
             
@@ -235,10 +239,9 @@ def archive_objects(paths: list[str], dry_run=False):
         print(f"Archiving {path}")
         file_checksum = sha256sum(path)
         metadata = get_object_metadata(path)
-        if not dry_run:
-            with open(path + '.archive_stub', 'wt') as f:
-                f.write(json.dumps({"entry_type":"pre_archive_check", "path":str(path), "sha256checksum":file_checksum, "metadata": metadata}) + '\n')
-            stubfiles.append(stubname(path))
+        with open(path + '.archive_stub', 'wt') as f:
+            f.write(json.dumps({"entry_type":"pre_archive_check", "path":str(path), "sha256checksum":file_checksum, "metadata": metadata}) + '\n')
+        stubfiles.append(stubname(path))
 
 
     # use a filelist to batch archive, this uses a single session instead of closing and opening as a plain loop would do
@@ -248,22 +251,13 @@ def archive_objects(paths: list[str], dry_run=False):
         tmpfile.write('\n'.join(filelist))
         tmpfile.seek(0)
 
-        if dry_run:
-            cmd = ['dsmc', 'preview', 'archive', f'-filelist={tmpfile.name}', '-changingretries=0', '-filesonly']
-        else:
-            cmd = ['dsmc', 'archive', f'-filelist={tmpfile.name}', '-changingretries=0', '-filesonly']
+        cmd = ['dsmc', 'archive', f'-filelist={tmpfile.name}', '-changingretries=0', '-filesonly']
 
-        try:
-            #subprocess.run(cmd, check=True)
-            subproc(cmd)
-        except subprocess.CalledProcessError as e:
-            print(f"Archive operation failed: {e}")
-            sys.exit(1)
+        subproc(cmd)
 
     for path in paths:
-        if not dry_run:
-            with open(path + '.archive_stub', 'at') as f:
-                f.write(json.dumps({'entry_type':"state", "state":"successfully_archived", "path":str(path)}) + '\n')
+        with open(path + '.archive_stub', 'at') as f:
+            f.write(json.dumps({'entry_type':"state", "state":"successfully_archived", "path":str(path)}) + '\n')
         print(f"successfully archived {path}")
 
     for path in paths:
@@ -280,24 +274,21 @@ def get_filesize(path) -> int:
     return int(stat.st_size)
 
 def get_all_filespaces():
-    try:
-        result = subproc(['dsmc', 'query', 'filespace'])
-        print(result.stdout)
-        return parse_file_space_names(str(result.stdout))
-    except subprocess.CalledProcessError as e:
-        print(f"Query filespaces operation failed: {e}")
-        sys.exit(1)
+    result = subproc(['dsmc', 'query', 'filespace'])
+    print(result.stdout)
+    return parse_file_space_names(str(result.stdout))
 
 def list_archived_objects_under_path(path, ignore_error=False):
-    try:
+    if ignore_error:
+        try:
+            result = subproc(['dsmc', 'query', 'archive', '-subdir=yes', path])
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            print(f"Query archive operation failed: {e}")
+    else:
         result = subproc(['dsmc', 'query', 'archive', '-subdir=yes', path])
         return result.stdout
-    except subprocess.CalledProcessError as e:
-        print(f"Query archive operation failed: {e}")
-        if ignore_error:
-            pass
-        else:
-            sys.exit(1)
+
 
 def list_archived_objects(paths, ignore_missing):
     print("Listing archived objects")
@@ -306,15 +297,13 @@ def list_archived_objects(paths, ignore_missing):
     if paths == []:
         # get all filespaces (filesystem paths):
         filespaces = get_all_filespaces()
-
-        for p in filespaces:
-            result = list_archived_objects_under_path(p.removesuffix('/') + '/*', ignore_error=ignore_missing)
-            print(result)
-
+        path_to_list = [p.removesuffix('/') + '/*' for p in paths]
     else:
-        for p in paths:
-            result = list_archived_objects_under_path(p)
-            print(result)
+        paths_to_list = paths
+
+    for p in paths_to_list:
+        result = list_archived_objects_under_path(p, ignore_error=ignore_missing)
+        print(f"archives under {p}: {result}")
 
 def get_from_archive(name, destination):
     print(f"getting {name} to {destination}")
@@ -328,12 +317,8 @@ def get_from_archive(name, destination):
     if Path(destination).exists():
         raise RuntimeError(f"destination path is not free, there is already a file or folder: {destination}")
 
-    try:
-        subproc(['dsmc', 'retrieve', '-replace=no', '-subdir=no', name, destination])
-        print(f"{name} successfully retrieved")
-    except subprocess.CalledProcessError as e:
-        print(f"Retrieving archive operation failed: {e}")
-        sys.exit(1)
+    subproc(['dsmc', 'retrieve', '-replace=no', '-subdir=no', name, destination])
+    print(f"{name} successfully retrieved")
 
 def retrieve_object(name, destination):
     # dont retrieving when source and destination indicate a recall operation
@@ -360,27 +345,18 @@ def delete_object(name):
         print(f"refusing to plainly delete archive directory, use '-r' with caution for directories")
         sys.exit(1)
 
-    try:
-        subproc(['dsmc', 'delete', 'archive', '-noprompt', name])
-        print(f"{name} successfully deleted from archive")
-    except subprocess.CalledProcessError as e:
-        print(f"Deleting archive operation failed: {e}")
-        sys.exit(1)
+    subproc(['dsmc', 'delete', 'archive', '-noprompt', name])
+    print(f"{name} successfully deleted from archive")
 
 
 def print_info():
     ''' print info about the IBM Storage Protect system '''
     print(f"getting systeminfo")
-    try:
-        with tempfile.NamedTemporaryFile(mode='w+', suffix='.log', prefix='app_', delete=True) as f:
-            result = subproc(['dsmc', 'query','systeminfo', f'-filename={f.name}'])
-            print(f"got syteminfo to {f.name}")
-            f.seek(0)
-            print(f.read())
-            
-    except subprocess.CalledProcessError as e:
-        print(f"querying systeminfo failed: {e}")
-        sys.exit(1)
+    with tempfile.NamedTemporaryFile(mode='w+', suffix='.log', prefix='app_', delete=True) as f:
+        result = subproc(['dsmc', 'query','systeminfo', f'-filename={f.name}'])
+        print(f"got syteminfo to {f.name}")
+        f.seek(0)
+        print(f.read())
 
     print(result.stdout)
 
@@ -396,7 +372,6 @@ def main():
 
     # Archive command
     archive_parser = subparsers.add_parser('archive', help='Migrate files to the archive system')
-    archive_parser.add_argument('--dry-run', '-n', action='store_true', dest='dry_run', help='dryrun the archiving')
     archive_parser.add_argument('object_path', nargs="+", type=str, help='Path to the file/folder to archive')
 
     # Retrieve command
@@ -420,7 +395,7 @@ def main():
     if args.command == 'list':
         list_archived_objects(args.path, args.ignore_missing)
     elif args.command == 'archive':
-        archive_objects(args.object_path, args.dry_run)
+        archive_objects(args.object_path)
     elif args.command == 'retrieve':
         if args.destination is None:
             destination = str(Path(os.getcwd()) / Path(args.object_name).name)
