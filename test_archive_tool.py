@@ -10,11 +10,14 @@ import random
 import re
 import string
 import socket
+import shutil
 
 import archive_tool
 
 # test config parameters
 tmp_testpath = '/data/'
+dsmc_spy_storepath = Path(tmp_testpath) / 'dsmc_spy_storage'
+dsmc_spy_storepath.mkdir(exist_ok=True, parents=True)
 seed = 42
 
 # unimportant/unused numbers were replaced with X
@@ -38,10 +41,16 @@ Session established with server XXXXXXX: XXX
   4     00/00/0   00:00:00     CIFS    /d
 '''
 DSMC_SPY = []
+DSMC_SPY_STORAGE = []
+
+def read_file(f):
+    with open(f,'rt') as f:
+        return str(f.read())
 
 def fake_dsmc(cmd, **kwargs):
     ''' this is a test-spy-object for "mocking" out the dsmc tool '''
     global DSMC_SPY
+    global DSMC_SPY_STORAGE
 
     DSMC_SPY += [cmd]
 
@@ -52,7 +61,12 @@ def fake_dsmc(cmd, **kwargs):
             stderr = ""
         return FakeRes()
     elif cmd[:2] == ['dsmc', 'archive']:
-        objnames = cmd[2:]
+        #objnames = cmd[2:]
+        objnames = read_file(cmd[2].removeprefix('-filelist=')).splitlines()
+        DSMC_SPY_STORAGE += [objnames]
+        for obj in objnames:
+            shutil.copy(obj, str(dsmc_spy_storepath / (Path(obj).name)))
+
         class FakeRes:
             stdout = ""
             stderr = ""
@@ -63,6 +77,10 @@ def fake_dsmc(cmd, **kwargs):
             stderr = ""
         return FakeRes()
     elif cmd[:2] == ['dsmc', 'retrieve']:
+        obj = cmd[-2]
+        dest = cmd[-1]
+        shutil.copy(str(Path(tmp_testpath) / 'dsmc_spy_storage' / (Path(obj).name)), dest)
+
         class FakeRes:
             stdout = ""
             stderr = ""
@@ -97,6 +115,9 @@ def fake_dsmc(cmd, **kwargs):
 @pytest.fixture
 def spy_dsmc(monkeypatch):
     monkeypatch.setattr(archive_tool, "subproc", fake_dsmc)
+    dsmc_spy_storepath.mkdir(exist_ok=True, parents=True)
+    yield
+    shutil.rmtree(dsmc_spy_storepath)
 
 
 def create_many_flat_folders_and_files(path, num_folders=10000):
@@ -367,7 +388,6 @@ def test_stress_archive_retrieval(tmp_path):
     print(f"{NUM_FILES} files archived and retrieved successfully")
 
 
-#@pytest.mark.skip(reason="very slow")
 def test_full_lifecycle_two_files():
     """ tests the full file lifecycle
     the file can transfer from local to archive,
@@ -453,16 +473,17 @@ def test_full_lifecycle_two_files():
 
 
 
-@pytest.mark.skip(reason="very slow")
 def test_small_with_spy(spy_dsmc):
     global DSMC_SPY
+    global DSMC_SPY_STORAGE
+
     archive_tool.list_archived_objects([], ignore_missing=True)
     assert DSMC_SPY[0] == ['dsmc', 'query', 'filespace'], DSMC_SPY
     assert DSMC_SPY[1][:2] == ['dsmc', 'query'], DSMC_SPY
     DSMC_SPY = []
     testfile = str(gen_random_file())
-    archive_tool.archive_objects([testfile], False)
-    assert DSMC_SPY[0][:2] == ['sha256sum', testfile], DSMC_SPY
+    archive_tool.archive_objects([testfile])
+    assert DSMC_SPY[0][:3] == ['sha256sum', '--', testfile], DSMC_SPY
     assert DSMC_SPY[1][:2] == ['dsmc', 'archive'], DSMC_SPY
     DSMC_SPY = []
     retrieve_target_filename = _generate_filename(True, MAX_FILENAME_LEN)
