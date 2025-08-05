@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3.12
 import argparse
 import os
 import sys
@@ -14,7 +14,7 @@ import datetime
 import socket
 
 # this tool is very very strict to remove as many error cases as possible
-# it tracks data more redundantly (possibly inconsistently) to ensure high availability and partition tolerance
+# it tracks metadata more redundantly
 
 # a main problem with tape archiving is that random access to tape archives is very (time) costly
 # so a main point of this tool is also, to prevent archiving small files that more likely need random access from being archived and left with only the slow tape-access
@@ -33,7 +33,9 @@ session_uuid = (uuid4())
 session_hostname = socket.getfqdn()
 session_hosttime = str(datetime.datetime.now().isoformat())
 
-add_dsmc_sudo = True
+# only set this to true if you have permanent sudo
+# otherwise your credentical cache timing out could fail the tool
+add_dsmc_sudo = False
 
 def subproc(cmd: List[str], with_sudo=False):
     ''' subprocess wrap function for better monkeypatching and better argument control '''
@@ -194,9 +196,9 @@ def sha256sum(filepath: str) -> str:
 
 def parse_stubfile(filepath) -> dict:
     with Path(filepath).open('rt') as f:
-        lines = list(f.readlines())
+        records = [json.loads(x) for x in list(f.readlines())]
 
-    return json.loads(lines[-1])
+    return records
 
 def stubname(path: str):
     ''' get the stubname of a file '''
@@ -251,9 +253,7 @@ def archive_objects(paths: list[str]):
     with tempfile.NamedTemporaryFile(mode='w+', suffix='.txt', prefix='archive_upload_filelist_') as tmpfile:
         tmpfile.write('\n'.join(filelist))
         tmpfile.seek(0)
-
         cmd = ['dsmc', 'archive', f'-filelist={tmpfile.name}', '-changingretries=0', '-filesonly']
-
         subproc(cmd)
 
     for path in paths:
@@ -264,10 +264,6 @@ def archive_objects(paths: list[str]):
     for path in paths:
         Path(path).unlink(missing_ok=False)
         print(f"successfully removed {path}")
-
-
-def archive_recursively(path):
-    raise NotImplementedError()
 
 
 def get_filesize(path) -> int:
@@ -318,22 +314,34 @@ def get_from_archive(name: str, destination: str):
     if Path(destination).exists():
         raise RuntimeError(f"destination path is not free, there is already a file or folder: {destination}")
 
+    stubfile_records = parse_stubfile(stubname(name))
+    if not stubfile_records[0]['entry_type'] == 'pre_archive_check':
+        raise RuntimeError(f'error parsing stubfile, first records isnt a pre_archive_check')
+    original_checksum = stubfile_records[0]['sha256checksum']
+
     subproc(['dsmc', 'retrieve', '-replace=no', '-subdir=no', name, destination])
-    print(f"{name} successfully retrieved")
+    print(f"{name} retrieved, now verifying")
+    file_checksum = sha256sum(destination)
+    if not original_checksum == file_checksum:
+        raise RuntimeError(f'got file from archive but checksum verification failed: archive path: {name}, destination {destination}')
+    print(f"{name} successfully verified")
 
 def retrieve_object(name, destination):
     # dont retrieving when source and destination indicate a recall operation
     if (Path(name).is_absolute() and Path(name) == Path(destination).resolve()) \
         or Path(stubname(destination)).exists():
         raise RuntimeError("retrieving a object to its original path is not supported. use recall to move a file from the archive back to its original path")
-    # todo open stubfile, to verify hash after retrieve
     get_from_archive(name, destination)
 
 def recall(name):
-    get_from_archive(name, name)
     with Path(stubname(name)).open('at') as f:
         f.write(json.dumps({'entry_type':"state", "state":"started_recalling", "path":str(name)}) + '\n')
+    get_from_archive(name, name)
+    with Path(stubname(name)).open('at') as f:
+        f.write(json.dumps({'entry_type':"state", "state":"verifieingrecalled_object_now_deleting", "path":str(name)}) + '\n')
     delete_object(name)
+    with Path(stubname(name)).open('at') as f:
+        f.write(json.dumps({'entry_type':"state", "state":"deleting_stubfile", "path":str(name)}) + '\n')
     # now also delete stubfile from archive
     delete_object(stubname(name))
     # finally delete the local stubfile
