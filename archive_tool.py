@@ -382,7 +382,7 @@ def main():
     list_parser.add_argument('--ignore-missing', dest='ignore_missing', action='store_true', help='continues listing, even if a path doesnt exist and errors occur')
 
     # Archive command
-    archive_parser = subparsers.add_parser('archive', help='Migrate files to the archive system')
+    archive_parser = subparsers.add_parser('archive', help='Migrate files to the archive system and creates a stubfile for it')
     archive_parser.add_argument('object_path', nargs="+", type=str, help='Path to the file/folder to archive')
 
     # Retrieve command
@@ -391,7 +391,7 @@ def main():
     retrieve_parser.add_argument('--destination', '-d', type=str, default=None,
                                 help='Target directory for retrieval (default: current directory)')
     # recall command
-    recall_parser = subparsers.add_parser('recall', help='Migrate an archived object back to its original path')
+    recall_parser = subparsers.add_parser('recall', help='Migrate an archived object back to its original path and removes the stubfile')
     recall_parser.add_argument('object_name', type=str, help='Name of archived object (without extension)')
 
     # Delete command
